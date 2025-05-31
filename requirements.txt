@@ -6,3 +6,4 @@ speechrecognition
 pydub
 ffmpeg-python
 SpeechRecognition
+requests
