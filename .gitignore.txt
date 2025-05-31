@@ -1,4 +1,0 @@
-credentials.json
-token.pickle
-cd.txt
-.env
