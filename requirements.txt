@@ -5,3 +5,4 @@ pytz
 speechrecognition
 pydub
 ffmpeg-python
+SpeechRecognition
