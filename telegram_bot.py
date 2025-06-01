@@ -40,7 +40,7 @@ async def parse_event_with_gpt(text):
         f"Текст: {text}"
     )
     try:
-        response = await client.chat.completions.create(
+        response = openai.ChatCompletion.create(...
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt}]
         )
