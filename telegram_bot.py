@@ -1,14 +1,14 @@
 import os
 import logging
-from telegram.ext import Updater, MessageHandler, Filters, CallbackContext
+import asyncio
 from telegram import Update
+from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
 import pytz
 import speech_recognition as sr
 from pydub import AudioSegment
-import json
-from openai import OpenAI  # Новий інтерфейс
+from openai import OpenAI
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
@@ -76,14 +76,14 @@ def add_event_to_calendar(summary, event_time):
         logging.error(f"Google Calendar error: {e}")
         return False
 
-def handle_voice(update: Update, context: CallbackContext):
+async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_active_time():
-        update.message.reply_text("⏰ Бот працює лише з 8:00 до 24:00. Повідомлення не приймаються в цей час.")
+        await update.message.reply_text("⏰ Бот працює лише з 8:00 до 24:00. Повідомлення не приймаються в цей час.")
         return
 
-    file = context.bot.get_file(update.message.voice.file_id)
+    file = await context.bot.get_file(update.message.voice.file_id)
     file_path = "voice.ogg"
-    file.download(file_path)
+    await file.download_to_drive(file_path)
     sound = AudioSegment.from_file(file_path)
     wav_path = "voice.wav"
     sound.export(wav_path, format="wav")
@@ -95,34 +95,31 @@ def handle_voice(update: Update, context: CallbackContext):
             text = recognizer.recognize_google(audio_data, language="uk-UA")
             logging.info(f"Розпізнано текст: {text}")
 
-            import asyncio
-            summary, event_time = asyncio.run(parse_event_with_gpt(text))
+            summary, event_time = await parse_event_with_gpt(text)
 
             if not summary or not event_time:
-                update.message.reply_text("❌ Не вдалося зчитати дату або час. Спробуйте перефразувати.")
+                await update.message.reply_text("❌ Не вдалося зчитати дату або час. Спробуйте перефразувати.")
                 return
 
             success = add_event_to_calendar(summary, event_time)
             if success:
-                update.message.reply_text(f"✅ Подія додана: {summary} о {event_time.strftime('%Y-%m-%d %H:%M')}")
+                await update.message.reply_text(f"✅ Подія додана: {summary} о {event_time.strftime('%Y-%m-%d %H:%M')}")
             else:
-                update.message.reply_text("❌ Не вдалося додати подію до календаря.")
+                await update.message.reply_text("❌ Не вдалося додати подію до календаря.")
         except sr.UnknownValueError:
-            update.message.reply_text("❌ Не вдалося розпізнати голосове повідомлення.")
+            await update.message.reply_text("❌ Не вдалося розпізнати голосове повідомлення.")
         except Exception as e:
             logging.error(f"Помилка: {e}")
-            update.message.reply_text("❌ Сталася помилка під час обробки повідомлення.")
+            await update.message.reply_text("❌ Сталася помилка під час обробки повідомлення.")
 
-def main():
+async def main():
     if not BOT_TOKEN:
         raise ValueError("❌ BOT_TOKEN не встановлено. Перевірте .env або змінні Railway.")
 
-    updater = Updater(BOT_TOKEN, use_context=True)
-    dp = updater.dispatcher
-    dp.add_handler(MessageHandler(Filters.voice, handle_voice))
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    app.add_handler(MessageHandler(filters.VOICE, handle_voice))
 
-    updater.start_polling()
-    updater.idle()
+    await app.run_polling()
 
 if __name__ == '__main__':
-    main()
+    asyncio.run(main())
