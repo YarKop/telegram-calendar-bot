@@ -26,11 +26,12 @@ def is_active_time() -> bool:
     return START_HOUR <= now.hour < END_HOUR
 
 import re
+
 def parse_time_from_text(text):
     try:
-        matches = re.findall(r'\b([01]?\d|2[0-3]):([0-5]\d)\b', text)
-        if matches:
-            hour, minute = map(int, matches[0])
+        match = re.search(r'\b([01]?\d|2[0-3]):([0-5]\d)\b', text)
+        if match:
+            hour, minute = map(int, match.groups())
             now = datetime.now(TIMEZONE)
             return now.replace(hour=hour, minute=minute, second=0, microsecond=0)
     except Exception as e:
