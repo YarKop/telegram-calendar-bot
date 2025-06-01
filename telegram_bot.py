@@ -25,6 +25,7 @@ def is_active_time() -> bool:
     now = datetime.now(TIMEZONE)
     return START_HOUR <= now.hour < END_HOUR
 
+import re
 def parse_time_from_text(text):
     try:
         matches = re.findall(r'\b([01]?\d|2[0-3]):([0-5]\d)\b', text)
