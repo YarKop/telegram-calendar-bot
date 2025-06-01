@@ -27,7 +27,7 @@ TIMEZONE = pytz.timezone('Canada/Eastern')
 START_HOUR = 8
 END_HOUR = 24
 
-client = openai.OpenAI(api_key=OPENAI_API_KEY)
+openai.api_key = OPENAI_API_KEY
 
 def is_active_time() -> bool:
     now = datetime.now(TIMEZONE)
@@ -40,11 +40,11 @@ def parse_event_with_gpt(text):
         f"Текст: {text}"
     )
     try:
-        response = client.chat.completions.create(
+        response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt}]
         )
-        result = response.choices[0].message.content.strip()
+        result = response["choices"][0]["message"]["content"].strip()
         parts = result.split('|')
         if len(parts) != 2:
             raise ValueError("Неправильний формат GPT-відповіді")
