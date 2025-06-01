@@ -33,18 +33,18 @@ def is_active_time() -> bool:
     now = datetime.now(TIMEZONE)
     return START_HOUR <= now.hour < END_HOUR
 
-def parse_event_with_gpt(text):
+async def parse_event_with_gpt(text):
     prompt = (
         "Виділи з тексту дату, час і короткий опис події. "
         "Формат відповіді: YYYY-MM-DD HH:MM | Назва події.\n"
         f"Текст: {text}"
     )
     try:
-        response = openai.ChatCompletion.create(
+        response = await openai.ChatCompletion.acreate(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt}]
         )
-        result = response["choices"][0]["message"]["content"].strip()
+        result = response.choices[0].message.content.strip()
         parts = result.split('|')
         if len(parts) != 2:
             raise ValueError("Неправильний формат GPT-відповіді")
@@ -94,10 +94,14 @@ def handle_voice(update: Update, context: CallbackContext):
         try:
             text = recognizer.recognize_google(audio_data, language="uk-UA")
             logging.info(f"Розпізнано текст: {text}")
-            summary, event_time = parse_event_with_gpt(text)
+
+            import asyncio
+            summary, event_time = asyncio.run(parse_event_with_gpt(text))
+
             if not summary or not event_time:
                 update.message.reply_text("❌ Не вдалося зчитати дату або час. Спробуйте перефразувати.")
                 return
+
             success = add_event_to_calendar(summary, event_time)
             if success:
                 update.message.reply_text(f"✅ Подія додана: {summary} о {event_time.strftime('%Y-%m-%d %H:%M')}")
