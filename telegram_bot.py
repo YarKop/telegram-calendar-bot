@@ -122,12 +122,6 @@ async def main():
     await app.run_polling()
 
 if __name__ == '__main__':
-    try:
-        asyncio.run(main())
-    except RuntimeError as e:
-        if "already running" in str(e):
-            import nest_asyncio
-            nest_asyncio.apply()
-            asyncio.get_event_loop().create_task(main())
-        else:
-            raise
+    import nest_asyncio
+    nest_asyncio.apply()
+    asyncio.run(main())
