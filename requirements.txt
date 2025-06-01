@@ -8,4 +8,4 @@ ffmpeg-python
 SpeechRecognition
 requests
 google-api-python-client
-openai
+openai>=1.0.0
