@@ -9,3 +9,4 @@ SpeechRecognition
 requests
 google-api-python-client
 openai>=1.0.0
+openai==0.28
