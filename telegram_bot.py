@@ -35,8 +35,9 @@ def is_active_time() -> bool:
 
 def parse_event_with_gpt(text):
     prompt = (
-        "Виділи з тексту дату, час і короткий опис події. "
-        "Формат відповіді: YYYY-MM-DD HH:MM | Назва події.\n"
+        "З тексту українською мовою виділи дату і час, а також короткий опис події. "
+        "Поверни результат строго у форматі: YYYY-MM-DD HH:MM | Назва події.\n"
+        "Якщо в тексті немає дати або часу — напиши: ERROR.\n"
         f"Текст: {text}"
     )
     try:
@@ -45,6 +46,10 @@ def parse_event_with_gpt(text):
             messages=[{"role": "user", "content": prompt}]
         )
         result = response['choices'][0]['message']['content'].strip()
+
+        if "ERROR" in result:
+            raise ValueError("GPT не зміг знайти дату або час")
+
         parts = result.split('|')
         if len(parts) != 2:
             raise ValueError("Неправильний формат GPT-відповіді")
