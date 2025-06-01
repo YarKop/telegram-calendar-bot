@@ -120,18 +120,14 @@ async def main():
     app.add_handler(MessageHandler(filters.VOICE, handle_voice))
 
     await app.run_polling()
-  
-if __name__ == '__main__':
-    import asyncio
 
+if __name__ == '__main__':
     try:
         asyncio.get_event_loop().run_until_complete(main())
     except RuntimeError as e:
         if str(e).startswith('This event loop is already running'):
-            # Для середовищ, які вже мають активний event loop
             loop = asyncio.get_event_loop()
             loop.create_task(main())
             loop.run_forever()
         else:
             raise
-
