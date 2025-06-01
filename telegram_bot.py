@@ -27,11 +27,14 @@ TIMEZONE = pytz.timezone('Canada/Eastern')
 START_HOUR = 8
 END_HOUR = 24
 
-openai.api_key = OPENAI_API_KEY
-
 def is_active_time() -> bool:
     now = datetime.now(TIMEZONE)
     return START_HOUR <= now.hour < END_HOUR
+
+import openai
+from openai import OpenAI
+
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 async def parse_event_with_gpt(text):
     prompt = (
@@ -40,7 +43,7 @@ async def parse_event_with_gpt(text):
         f"Текст: {text}"
     )
     try:
-        response = await openai.ChatCompletion.acreate(
+        response = await client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt}]
         )
