@@ -7,3 +7,4 @@ pydub
 ffmpeg-python
 SpeechRecognition
 requests
+google-api-python-client
