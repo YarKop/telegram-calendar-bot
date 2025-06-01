@@ -12,8 +12,19 @@ from openai import OpenAI
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
-# Завантаження змінних середовища
 load_dotenv()
+import os
+import json
+
+# Зберегти credentials.json зі змінної середовища
+if not os.path.exists("credentials.json"):
+    creds_content = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+    if creds_content:
+        with open("credentials.json", "w") as f:
+            f.write(creds_content)
+    else:
+        raise ValueError("❌ GOOGLE_SERVICE_ACCOUNT_JSON is empty or not set")
+
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CALENDAR_ID = os.getenv("CALENDAR_ID")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
