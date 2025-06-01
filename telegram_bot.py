@@ -25,16 +25,15 @@ def is_active_time() -> bool:
     now = datetime.now(TIMEZONE)
     return START_HOUR <= now.hour < END_HOUR
 
-def parse_time_from_text(text: str):
+def parse_time_from_text(text):
     try:
-        if ':' in text:
-            parts = text.split(':')
-            hour = int(parts[0])
-            minute = int(parts[1])
-            if 0 <= hour < 24 and 0 <= minute < 60:
-                return hour, minute
-    except Exception:
-        return None
+        matches = re.findall(r'\b([01]?\d|2[0-3]):([0-5]\d)\b', text)
+        if matches:
+            hour, minute = map(int, matches[0])
+            now = datetime.now(TIMEZONE)
+            return now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    except Exception as e:
+        logging.error(f"Помилка парсингу часу: {e}")
     return None
 
 def add_to_google_calendar(event_summary: str, hour: int, minute: int):
