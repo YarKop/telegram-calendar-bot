@@ -8,7 +8,7 @@ import pytz
 import speech_recognition as sr
 from pydub import AudioSegment
 import json
-import openai  # Додаємо OpenAI
+from openai import OpenAI
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
@@ -33,23 +33,21 @@ def is_active_time() -> bool:
     now = datetime.now(TIMEZONE)
     return START_HOUR <= now.hour < END_HOUR
 
+from openai import OpenAI
+client = OpenAI(api_key=OPENAI_API_KEY)
+
 def parse_event_with_gpt(text):
     prompt = (
-        "З тексту українською мовою виділи дату і час, а також короткий опис події. "
-        "Поверни результат строго у форматі: YYYY-MM-DD HH:MM | Назва події.\n"
-        "Якщо в тексті немає дати або часу — напиши: ERROR.\n"
+        "Виділи з тексту дату, час і короткий опис події. "
+        "Формат відповіді: YYYY-MM-DD HH:MM | Назва події.\n"
         f"Текст: {text}"
     )
     try:
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt}]
         )
-        result = response['choices'][0]['message']['content'].strip()
-
-        if "ERROR" in result:
-            raise ValueError("GPT не зміг знайти дату або час")
-
+        result = response.choices[0].message.content.strip()
         parts = result.split('|')
         if len(parts) != 2:
             raise ValueError("Неправильний формат GPT-відповіді")
