@@ -7,9 +7,10 @@ from datetime import datetime, timedelta
 import pytz
 import speech_recognition as sr
 from pydub import AudioSegment
-import requests
 import json
 import openai  # Додаємо OpenAI
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
 
 # Завантаження змінних середовища
 load_dotenv()
@@ -39,15 +40,11 @@ def parse_event_with_gpt(text):
         f"Текст: {text}"
     )
     try:
-        from openai import OpenAI
-
-client = OpenAI(api_key=OPENAI_API_KEY)
-response = client.chat.completions.create(
-    model="gpt-3.5-turbo",
-    messages=[{"role": "user", "content": prompt}]
-)
-result = response.choices[0].message.content.strip()
-
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        result = response['choices'][0]['message']['content'].strip()
         parts = result.split('|')
         if len(parts) != 2:
             raise ValueError("Неправильний формат GPT-відповіді")
@@ -61,19 +58,23 @@ result = response.choices[0].message.content.strip()
         return None, None
 
 def add_event_to_calendar(summary, event_time):
-    url = f"https://www.googleapis.com/calendar/v3/calendars/{CALENDAR_ID}/events"
-    headers = {
-        "Authorization": f"Bearer {os.getenv('GOOGLE_ACCESS_TOKEN')}",
-        "Content-Type": "application/json"
-    }
-    end_time = event_time + timedelta(hours=1)
-    event = {
-        "summary": summary,
-        "start": {"dateTime": event_time.isoformat(), "timeZone": str(TIMEZONE)},
-        "end": {"dateTime": end_time.isoformat(), "timeZone": str(TIMEZONE)}
-    }
-    response = requests.post(url, headers=headers, data=json.dumps(event))
-    return response.status_code == 200 or response.status_code == 201
+    try:
+        credentials = service_account.Credentials.from_service_account_file(
+            SERVICE_ACCOUNT_FILE,
+            scopes=["https://www.googleapis.com/auth/calendar"]
+        )
+        service = build("calendar", "v3", credentials=credentials)
+        end_time = event_time + timedelta(hours=1)
+        event = {
+            "summary": summary,
+            "start": {"dateTime": event_time.isoformat(), "timeZone": str(TIMEZONE)},
+            "end": {"dateTime": end_time.isoformat(), "timeZone": str(TIMEZONE)}
+        }
+        service.events().insert(calendarId=CALENDAR_ID, body=event).execute()
+        return True
+    except Exception as e:
+        logging.error(f"Google Calendar error: {e}")
+        return False
 
 def handle_voice(update: Update, context: CallbackContext):
     if not is_active_time():
