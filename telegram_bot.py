@@ -33,14 +33,14 @@ def is_active_time() -> bool:
     now = datetime.now(TIMEZONE)
     return START_HOUR <= now.hour < END_HOUR
 
-async def parse_event_with_gpt(text):
+def parse_event_with_gpt(text):
     prompt = (
         "Виділи з тексту дату, час і короткий опис події. "
         "Формат відповіді: YYYY-MM-DD HH:MM | Назва події.\n"
         f"Текст: {text}"
     )
     try:
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt}]
         )
@@ -95,7 +95,7 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text = recognizer.recognize_google(audio_data, language="uk-UA")
             logging.info(f"Розпізнано текст: {text}")
 
-            summary, event_time = await parse_event_with_gpt(text)
+            summary, event_time = parse_event_with_gpt(text)
 
             if not summary or not event_time:
                 await update.message.reply_text("❌ Не вдалося зчитати дату або час. Спробуйте перефразувати.")
