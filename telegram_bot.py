@@ -1,85 +1,110 @@
 import os
 import logging
-import pytz
-from telegram import Update
 from telegram.ext import Updater, MessageHandler, Filters, CallbackContext
-from datetime import datetime
+from telegram import Update
 from dotenv import load_dotenv
+from datetime import datetime, timedelta
+import pytz
 import speech_recognition as sr
-from pydub import AudioSegment
-import uuid
+import requests
 import json
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
 
 # Завантаження змінних середовища
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 TIMEZONE = pytz.timezone('Canada/Eastern')
 
-# Google Calendar
-SERVICE_ACCOUNT_INFO = json.loads(os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON"))
-SCOPES = ['https://www.googleapis.com/auth/calendar']
-credentials = service_account.Credentials.from_service_account_info(SERVICE_ACCOUNT_INFO, scopes=SCOPES)
-calendar_service = build('calendar', 'v3', credentials=credentials)
-CALENDAR_ID = 'primary'  # або конкретний ID
+# Увімкнення логування
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-# Час активності
+# Обмеження активності
 START_HOUR = 8
 END_HOUR = 24
 
-# Логування
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                    level=logging.INFO)
-
-def is_active_time():
+def is_active_time() -> bool:
     now = datetime.now(TIMEZONE)
     return START_HOUR <= now.hour < END_HOUR
 
-def recognize_voice(file_path: str) -> str:
-    recognizer = sr.Recognizer()
-    audio = AudioSegment.from_ogg(file_path)
-    wav_path = file_path.replace('.oga', '.wav')
-    audio.export(wav_path, format='wav')
-    with sr.AudioFile(wav_path) as source:
-        audio_data = recognizer.record(source)
-        return recognizer.recognize_google(audio_data, language='uk-UA')
+def parse_time_from_text(text: str):
+    try:
+        if ':' in text:
+            parts = text.split(':')
+            hour = int(parts[0])
+            minute = int(parts[1])
+            if 0 <= hour < 24 and 0 <= minute < 60:
+                return hour, minute
+    except Exception:
+        return None
+    return None
 
-def create_event(text: str):
+def add_to_google_calendar(event_summary: str, hour: int, minute: int):
     now = datetime.now(TIMEZONE)
-    end = now.replace(minute=now.minute + 30)
+    start_time = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    end_time = start_time + timedelta(minutes=30)
+
     event = {
-        'summary': text,
-        'start': {'dateTime': now.isoformat(), 'timeZone': 'Canada/Eastern'},
-        'end': {'dateTime': end.isoformat(), 'timeZone': 'Canada/Eastern'},
+        "summary": event_summary,
+        "start": {"dateTime": start_time.isoformat(), "timeZone": "America/Toronto"},
+        "end": {"dateTime": end_time.isoformat(), "timeZone": "America/Toronto"},
     }
-    calendar_service.events().insert(calendarId=CALENDAR_ID, body=event).execute()
+
+    calendar_id = os.getenv("CALENDAR_ID")
+    access_token = os.getenv("GOOGLE_ACCESS_TOKEN")
+
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json"
+    }
+
+    response = requests.post(
+        f"https://www.googleapis.com/calendar/v3/calendars/{calendar_id}/events",
+        headers=headers,
+        data=json.dumps(event)
+    )
+
+    return response.status_code == 200 or response.status_code == 201
 
 def handle_voice(update: Update, context: CallbackContext):
     if not is_active_time():
-        update.message.reply_text("⏰ Бот працює з 8:00 до 24:00.")
+        update.message.reply_text("⏰ Бот працює лише з 8:00 до 24:00. Повідомлення не приймаються в цей час.")
         return
 
-    voice = update.message.voice
-    file_id = voice.file_id
-    new_file = context.bot.get_file(file_id)
-    filename = f"/tmp/{uuid.uuid4()}.oga"
-    new_file.download(filename)
+    file = update.message.voice.get_file()
+    file.download("voice.ogg")
+
+    os.system("ffmpeg -i voice.ogg voice.wav -y")
+    recognizer = sr.Recognizer()
+    with sr.AudioFile("voice.wav") as source:
+        audio = recognizer.record(source)
 
     try:
-        text = recognize_voice(filename)
-        create_event(text)
-        update.message.reply_text(f"✅ Додано подію: {text}")
+        text = recognizer.recognize_google(audio, language="uk-UA")
+        logging.info(f"Розпізнано текст: {text}")
+
+        time_info = parse_time_from_text(text)
+        if time_info:
+            hour, minute = time_info
+            success = add_to_google_calendar(event_summary=text, hour=hour, minute=minute)
+            if success:
+                update.message.reply_text(f"✅ Подію додано: '{text}' на {hour:02}:{minute:02}")
+            else:
+                update.message.reply_text("⚠️ Не вдалося додати подію до Google Calendar.")
+        else:
+            update.message.reply_text("❌ Неможливо зчитати час. Спробуйте сказати в форматі 14:30 або 9:15.")
+
+    except sr.UnknownValueError:
+        update.message.reply_text("⚠️ Не вдалося розпізнати повідомлення.")
     except Exception as e:
-        logging.error(str(e))
-        update.message.reply_text("⚠️ Не вдалося розпізнати повідомлення або додати подію.")
+        logging.error(f"Помилка: {e}")
+        update.message.reply_text("⚠️ Сталася помилка під час обробки.")
 
 def main():
     if not BOT_TOKEN:
-        raise ValueError("❌ BOT_TOKEN не встановлено.")
+        raise ValueError("❌ BOT_TOKEN не встановлено. Перевірте .env або змінні Railway.")
 
     updater = Updater(BOT_TOKEN, use_context=True)
     dp = updater.dispatcher
+
     dp.add_handler(MessageHandler(Filters.voice, handle_voice))
 
     updater.start_polling()
