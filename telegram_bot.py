@@ -8,7 +8,7 @@ import pytz
 import speech_recognition as sr
 from pydub import AudioSegment
 import json
-from openai import OpenAI
+import openai  # Додаємо OpenAI
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
@@ -27,14 +27,11 @@ TIMEZONE = pytz.timezone('Canada/Eastern')
 START_HOUR = 8
 END_HOUR = 24
 
-openai.api_key = OPENAI_API_KEY
+client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
 def is_active_time() -> bool:
     now = datetime.now(TIMEZONE)
     return START_HOUR <= now.hour < END_HOUR
-
-from openai import OpenAI
-client = OpenAI(api_key=OPENAI_API_KEY)
 
 def parse_event_with_gpt(text):
     prompt = (
